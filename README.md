@@ -70,4 +70,4 @@ Movement alerts are also printed to the terminal:
 - Stationary objects are not detectable (only movement disrupts the signal)
 - Works best in a controlled environment with a stable baseline signal :)
 
-> **Note:** Further testing on limitations and accuracy is ongoing and will be published in future releases.
+> **Note:** Further testing on limitations and accuracy is ongoing and will be published in future releases. This project is in early development — expect breaking changes.
