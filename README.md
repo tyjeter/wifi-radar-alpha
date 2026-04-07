@@ -2,7 +2,7 @@
 
 Detect movement and presence by monitoring disruptions in Wi-Fi signals — no camera, no special sensor, just a Wi-Fi adapter.
 
-## How it works
+## Abstract
 
 Objects moving through a space reflect and absorb Wi-Fi signals, causing measurable changes in signal strength (RSSI). This tool captures raw packets in monitor mode, tracks RSSI over time, and flags statistically significant disruptions as movement events.
 
@@ -66,6 +66,6 @@ Movement alerts are also printed to the terminal:
 
 ## Limitations
 
-- RSSI-only detection — good for presence/movement, not precise location
+- RSSI-only detection — good for presence/movement, not precise location (a baseline is required and cannot measure objects that are stationary)
 - Stationary objects are not detectable (only movement disrupts the signal)
-- Works best in a controlled environment with a stable baseline signal
+- Works best in a controlled environment with a stable baseline signal :)
