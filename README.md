@@ -68,6 +68,6 @@ Movement alerts are also printed to the terminal:
 
 - RSSI-only detection — good for presence/movement, not precise location (a baseline is required and cannot measure objects that are stationary)
 - Stationary objects are not detectable (only movement disrupts the signal)
-- Works best in a controlled environment with a stable baseline signal :)
+- Works best in a controlled environment with a stable baseline signal
 
-> **Note:** Further testing on limitations and accuracy is ongoing and will be published in future releases. This project is in early development — expect breaking changes.
+> **Note:** Further testing on limitations and accuracy is ongoing and will be published in future releases. This project is in early development please expect and welcome breaking changes :)
