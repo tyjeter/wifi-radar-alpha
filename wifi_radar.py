@@ -154,6 +154,54 @@ class WifiRadar:
             print(f"[!] MOVEMENT DETECTED  |  RSSI: {current:.1f} dBm  |  z-score: {z_score:.2f}")
 
     # ------------------------------------------------------------------
+    # State export (used by dashboard)
+    # ------------------------------------------------------------------
+
+    def get_state(self) -> dict:
+        """Return current radar state as a JSON-serialisable dict."""
+        with self._lock:
+            rssi = list(self.rssi_buffer)
+            timestamps = list(self.timestamps)
+            events = list(self.movement_events)
+            count = self._packet_count
+            calibrated = self._calibrated
+
+        return {
+            "rssi": rssi,
+            "timestamps": timestamps,
+            "movement_events": events[-50:],  # last 50 events
+            "packet_count": count,
+            "calibrated": calibrated,
+            "current_rssi": rssi[-1] if rssi else None,
+            "heatmap": self._build_heatmap(rssi, timestamps),
+        }
+
+    def _build_heatmap(self, rssi: list, timestamps: list,
+                       window: int = 120, bin_sec: int = 1,
+                       rssi_min: int = -100, rssi_max: int = -20, rssi_step: int = 5) -> dict:
+        """Build a 2-D heatmap matrix: time bins × RSSI buckets."""
+        now = time.time()
+        cutoff = now - window
+
+        n_time = window // bin_sec
+        n_rssi = (rssi_max - rssi_min) // rssi_step
+
+        matrix = [[0] * n_time for _ in range(n_rssi)]
+
+        for ts, r in zip(timestamps, rssi):
+            if ts < cutoff:
+                continue
+            t_idx = min(int((ts - cutoff) / bin_sec), n_time - 1)
+            r_idx = min(int((r - rssi_min) / rssi_step), n_rssi - 1)
+            if 0 <= t_idx < n_time and 0 <= r_idx < n_rssi:
+                matrix[r_idx][t_idx] += 1
+
+        # Y-axis labels e.g. ["-100","-95",...,"-25"]
+        y_labels = [str(rssi_min + i * rssi_step) for i in range(n_rssi)]
+
+        return {"matrix": matrix, "y_labels": y_labels, "n_time": n_time, "window": window}
+
+    # ------------------------------------------------------------------
     # Sniffing (runs in background thread)
     # ------------------------------------------------------------------
 

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wi-Fi Radar Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+
+    header h1 span {
+      font-size: 0.75rem;
+      background: #1f3a5f;
+      color: #58a6ff;
+      border: 1px solid #58a6ff44;
+      border-radius: 4px;
+      padding: 2px 8px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    #status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #8b949e;
+    }
+
+    #status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #444;
+      transition: background 0.3s;
+    }
+
+    #status-dot.calibrating { background: #d29922; animation: pulse 1.5s infinite; }
+    #status-dot.active      { background: #3fb950; }
+    #status-dot.movement    { background: #f85149; animation: pulse 0.5s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .stat-card .label {
+      font-size: 0.75rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .stat-card .value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #e6edf3;
+    }
+
+    .stat-card .value.rssi  { color: #58a6ff; }
+    .stat-card .value.alert { color: #f85149; }
+    .stat-card .value.ok    { color: #3fb950; }
+
+    .charts {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .chart-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .chart-card h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .chart-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .movement-log {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .movement-log h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .log-entry {
+      font-size: 0.8rem;
+      color: #f85149;
+      padding: 4px 0;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      gap: 12px;
+    }
+
+    .log-entry .ts { color: #8b949e; font-family: monospace; }
+
+    #no-events {
+      font-size: 0.8rem;
+      color: #484f58;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Wi-Fi Radar <span>ALPHA</span></h1>
+  <div id="status-badge">
+    <div id="status-dot"></div>
+    <span id="status-text">Connecting...</span>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="label">Packets Captured</div>
+    <div class="value" id="stat-packets">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Current RSSI</div>
+    <div class="value rssi" id="stat-rssi">— dBm</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Movement Events</div>
+    <div class="value" id="stat-events">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Status</div>
+    <div class="value ok" id="stat-status">—</div>
+  </div>
+</div>
+
+<div class="charts">
+  <!-- Heatmap -->
+  <div class="chart-card">
+    <h2>Signal Heatmap — Time vs RSSI Bucket (last 120s)</h2>
+    <div id="heatmap" style="height:280px;"></div>
+  </div>
+
+  <div class="chart-row">
+    <!-- RSSI line -->
+    <div class="chart-card">
+      <h2>Live RSSI Signal</h2>
+      <div id="rssi-chart" style="height:220px;"></div>
+    </div>
+
+    <!-- Movement log -->
+    <div class="movement-log">
+      <h2>Movement Log</h2>
+      <div id="event-log"><span id="no-events">No movement detected yet.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // -----------------------------------------------------------------------
+  // Chart layout defaults
+  // -----------------------------------------------------------------------
+  const darkBg   = "#161b22";
+  const gridCol  = "#21262d";
+  const textCol  = "#8b949e";
+
+  const baseLayout = {
+    paper_bgcolor: darkBg,
+    plot_bgcolor:  darkBg,
+    font:  { color: textCol, size: 11 },
+    margin: { t: 10, r: 10, b: 40, l: 50 },
+    xaxis: { gridcolor: gridCol, zerolinecolor: gridCol },
+    yaxis: { gridcolor: gridCol, zerolinecolor: gridCol },
+  };
+
+  // -----------------------------------------------------------------------
+  // Initialise charts (empty)
+  // -----------------------------------------------------------------------
+
+  // Heatmap
+  Plotly.newPlot("heatmap", [{
+    type: "heatmap",
+    z: [],
+    colorscale: [
+      [0,    "#0d1117"],
+      [0.01, "#1f3a5f"],
+      [0.3,  "#1f6feb"],
+      [0.6,  "#f0883e"],
+      [1,    "#f85149"],
+    ],
+    showscale: true,
+    colorbar: { thickness: 12, outlinewidth: 0, tickfont: { color: textCol, size: 10 } },
+    hovertemplate: "Time: %{x}s ago<br>RSSI: %{y} dBm<br>Count: %{z}<extra></extra>",
+  }], {
+    ...baseLayout,
+    xaxis: { ...baseLayout.xaxis, title: "Seconds ago", autorange: "reversed" },
+    yaxis: { ...baseLayout.yaxis, title: "RSSI (dBm)" },
+    margin: { t: 10, r: 80, b: 50, l: 60 },
+  }, { responsive: true, displayModeBar: false });
+
+  // RSSI line chart
+  Plotly.newPlot("rssi-chart", [
+    { y: [], type: "scatter", mode: "lines", name: "Raw",
+      line: { color: "#1f6feb", width: 1 }, opacity: 0.6 },
+    { y: [], type: "scatter", mode: "lines", name: "Smoothed",
+      line: { color: "#58a6ff", width: 2 } },
+  ], {
+    ...baseLayout,
+    yaxis: { ...baseLayout.yaxis, title: "dBm", range: [-100, -20] },
+    xaxis: { ...baseLayout.xaxis, title: "Samples", showticklabels: false },
+    legend: { font: { color: textCol, size: 10 }, bgcolor: "transparent" },
+    margin: { t: 10, r: 10, b: 30, l: 50 },
+  }, { responsive: true, displayModeBar: false });
+
+  // -----------------------------------------------------------------------
+  // Simple moving average
+  // -----------------------------------------------------------------------
+  function smooth(arr, w = 5) {
+    return arr.map((_, i) => {
+      const slice = arr.slice(Math.max(0, i - w + 1), i + 1);
+      return slice.reduce((a, b) => a + b, 0) / slice.length;
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // SSE stream
+  // -----------------------------------------------------------------------
+  let lastEventCount = 0;
+
+  const es = new EventSource("/stream");
+
+  es.onmessage = (e) => {
+    let data;
+    try { data = JSON.parse(e.data); } catch { return; }
+    if (!data || !data.rssi) return;
+
+    // --- Status ---
+    const dot  = document.getElementById("status-dot");
+    const txt  = document.getElementById("status-text");
+    const recentMovement = data.movement_events.length > lastEventCount;
+
+    if (recentMovement) {
+      dot.className = "movement";
+      txt.textContent = "Movement Detected!";
+      setTimeout(() => {
+        dot.className = "active";
+        txt.textContent = "Monitoring";
+      }, 2000);
+    } else if (!data.calibrated) {
+      dot.className = "calibrating";
+      txt.textContent = `Calibrating (${data.rssi.length} samples)`;
+    } else {
+      dot.className = "active";
+      txt.textContent = "Monitoring";
+    }
+
+    // --- Stats ---
+    document.getElementById("stat-packets").textContent =
+      data.packet_count.toLocaleString();
+    document.getElementById("stat-rssi").textContent =
+      data.current_rssi !== null ? `${data.current_rssi} dBm` : "— dBm";
+    document.getElementById("stat-events").textContent =
+      data.movement_events.length;
+
+    const statusEl = document.getElementById("stat-status");
+    statusEl.textContent = data.calibrated ? "Active" : "Calibrating";
+    statusEl.className   = `value ${data.calibrated ? "ok" : ""}`;
+
+    // --- Heatmap ---
+    if (data.heatmap && data.heatmap.matrix.length) {
+      const hm = data.heatmap;
+      const xTicks = Array.from({ length: hm.n_time }, (_, i) => hm.window - i);
+      Plotly.react("heatmap", [{
+        type: "heatmap",
+        z: hm.matrix,
+        x: xTicks,
+        y: hm.y_labels,
+        colorscale: [
+          [0,    "#0d1117"],
+          [0.01, "#1f3a5f"],
+          [0.3,  "#1f6feb"],
+          [0.6,  "#f0883e"],
+          [1,    "#f85149"],
+        ],
+        showscale: true,
+        colorbar: { thickness: 12, outlinewidth: 0, tickfont: { color: textCol, size: 10 } },
+        hovertemplate: "Time: %{x}s ago<br>RSSI: %{y} dBm<br>Count: %{z}<extra></extra>",
+      }], {
+        ...baseLayout,
+        xaxis: { ...baseLayout.xaxis, title: "Seconds ago", autorange: "reversed" },
+        yaxis: { ...baseLayout.yaxis, title: "RSSI (dBm)" },
+        margin: { t: 10, r: 80, b: 50, l: 60 },
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    // --- RSSI line ---
+    const rssi = data.rssi;
+    if (rssi.length) {
+      Plotly.react("rssi-chart", [
+        { y: rssi, type: "scatter", mode: "lines", name: "Raw",
+          line: { color: "#1f6feb", width: 1 }, opacity: 0.6 },
+        { y: smooth(rssi), type: "scatter", mode: "lines", name: "Smoothed",
+          line: { color: "#58a6ff", width: 2 } },
+      ], {
+        ...baseLayout,
+        yaxis: { ...baseLayout.yaxis, title: "dBm", range: [-100, -20] },
+        xaxis: { ...baseLayout.xaxis, showticklabels: false },
+        legend: { font: { color: textCol, size: 10 }, bgcolor: "transparent" },
+        margin: { t: 10, r: 10, b: 30, l: 50 },
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    // --- Movement log ---
+    if (data.movement_events.length !== lastEventCount) {
+      lastEventCount = data.movement_events.length;
+      const log = document.getElementById("event-log");
+      const noEvt = document.getElementById("no-events");
+      if (noEvt) noEvt.remove();
+
+      log.innerHTML = [...data.movement_events].reverse().map(ts => {
+        const d = new Date(ts * 1000);
+        const timeStr = d.toLocaleTimeString();
+        return `<div class="log-entry"><span class="ts">${timeStr}</span><span>⚠ Movement detected</span></div>`;
+      }).join("");
+    }
+  };
+
+  es.onerror = () => {
+    document.getElementById("status-dot").className = "";
+    document.getElementById("status-text").textContent = "Disconnected";
+  };
+</script>
+</body>
+</html>
