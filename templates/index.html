@@ -3,176 +3,106 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wi-Fi Radar Dashboard</title>
+  <title>Wi-Fi Radar — {{ device_name }}</title>
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background:#0d1117; color:#e6edf3; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; min-height:100vh; padding:20px; }
 
-    body {
-      background: #0d1117;
-      color: #e6edf3;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      min-height: 100vh;
-      padding: 20px;
-    }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    header h1 { font-size:1.4rem; font-weight:600; color:#58a6ff; }
+    .badge { font-size:0.7rem; background:#1f3a5f; color:#58a6ff; border:1px solid #58a6ff44; border-radius:4px; padding:2px 8px; margin-left:8px; vertical-align:middle; }
+    .header-actions { display:flex; align-items:center; gap:10px; }
+    .btn { background:#161b22; border:1px solid #30363d; color:#8b949e; border-radius:6px; padding:6px 14px; font-size:0.8rem; cursor:pointer; text-decoration:none; transition:border-color .2s; }
+    .btn:hover { border-color:#58a6ff; color:#58a6ff; }
+    .btn-danger { border-color:#f8514944; color:#f85149; }
+    .btn-danger:hover { border-color:#f85149; }
 
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
+    #status-badge { display:flex; align-items:center; gap:8px; font-size:0.85rem; color:#8b949e; }
+    #status-dot { width:10px; height:10px; border-radius:50%; background:#444; transition:background .3s; }
+    #status-dot.calibrating { background:#d29922; animation:pulse 1.5s infinite; }
+    #status-dot.active      { background:#3fb950; }
+    #status-dot.movement    { background:#f85149; animation:pulse .5s infinite; }
 
-    header h1 {
-      font-size: 1.4rem;
-      font-weight: 600;
-      color: #58a6ff;
-    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-    header h1 span {
-      font-size: 0.75rem;
-      background: #1f3a5f;
-      color: #58a6ff;
-      border: 1px solid #58a6ff44;
-      border-radius: 4px;
-      padding: 2px 8px;
-      margin-left: 8px;
-      vertical-align: middle;
-    }
+    /* Fall alert banner */
+    #fall-banner { display:none; background:#5a0f0f; border:1px solid #f85149; border-radius:8px; padding:12px 16px; margin-bottom:14px; color:#f85149; font-weight:600; font-size:0.9rem; }
+    #fall-banner.visible { display:flex; align-items:center; justify-content:space-between; }
+    #fall-dismiss { background:none; border:none; color:#f85149; font-size:1.2rem; cursor:pointer; }
 
-    #status-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.85rem;
-      color: #8b949e;
-    }
+    /* Stats */
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+    @media(max-width:800px) { .stats { grid-template-columns:repeat(2,1fr); } }
+    .stat-card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px; }
+    .stat-card .label { font-size:0.72rem; color:#8b949e; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+    .stat-card .value { font-size:1.5rem; font-weight:700; color:#e6edf3; }
+    .value.rssi    { color:#58a6ff; }
+    .value.alert   { color:#f85149; }
+    .value.ok      { color:#3fb950; }
+    .value.warn    { color:#d29922; }
+    .value.sm      { font-size:1rem; }
 
-    #status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #444;
-      transition: background 0.3s;
-    }
+    /* Layout */
+    .section { margin-bottom:16px; }
+    .chart-card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; }
+    .chart-card h2 { font-size:0.82rem; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:700px) { .row2 { grid-template-columns:1fr; } }
 
-    #status-dot.calibrating { background: #d29922; animation: pulse 1.5s infinite; }
-    #status-dot.active      { background: #3fb950; }
-    #status-dot.movement    { background: #f85149; animation: pulse 0.5s infinite; }
+    /* Zone editor */
+    #zone-instructions { font-size:0.78rem; color:#8b949e; margin-top:6px; }
+    #zone-form { display:none; margin-top:10px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:12px; gap:8px; flex-wrap:wrap; align-items:center; }
+    #zone-form.visible { display:flex; }
+    #zone-form input { background:#161b22; border:1px solid #30363d; color:#e6edf3; border-radius:4px; padding:5px 8px; font-size:0.8rem; width:110px; }
+    #zone-form input::placeholder { color:#484f58; }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.3; }
-    }
+    /* Movement log */
+    .movement-log { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; max-height:260px; overflow-y:auto; }
+    .movement-log h2 { font-size:0.82rem; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px; }
+    .log-entry { font-size:0.78rem; padding:4px 0; border-bottom:1px solid #21262d; display:flex; gap:10px; }
+    .log-entry .ts { color:#8b949e; font-family:monospace; }
+    .log-entry.fall { color:#f85149; font-weight:600; }
+    .log-entry.zone { color:#d29922; }
+    #no-events { font-size:0.8rem; color:#484f58; }
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 20px;
-    }
+    /* Playback */
+    #playback-panel { display:none; }
+    #playback-panel.visible { display:block; }
+    .playback-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+    .playback-controls input[type=range] { flex:1; min-width:150px; accent-color:#58a6ff; }
+    .playback-controls input[type=datetime-local] { background:#161b22; border:1px solid #30363d; color:#e6edf3; border-radius:4px; padding:5px 8px; font-size:0.78rem; }
+    #playback-ts { font-family:monospace; font-size:0.78rem; color:#8b949e; min-width:160px; }
 
-    .stat-card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 16px;
-    }
-
-    .stat-card .label {
-      font-size: 0.75rem;
-      color: #8b949e;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 6px;
-    }
-
-    .stat-card .value {
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: #e6edf3;
-    }
-
-    .stat-card .value.rssi  { color: #58a6ff; }
-    .stat-card .value.alert { color: #f85149; }
-    .stat-card .value.ok    { color: #3fb950; }
-
-    .charts {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-
-    .chart-card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 16px;
-    }
-
-    .chart-card h2 {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #8b949e;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 12px;
-    }
-
-    .chart-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    .movement-log {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 16px;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-
-    .movement-log h2 {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #8b949e;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 12px;
-    }
-
-    .log-entry {
-      font-size: 0.8rem;
-      color: #f85149;
-      padding: 4px 0;
-      border-bottom: 1px solid #21262d;
-      display: flex;
-      gap: 12px;
-    }
-
-    .log-entry .ts { color: #8b949e; font-family: monospace; }
-
-    #no-events {
-      font-size: 0.8rem;
-      color: #484f58;
-    }
+    /* Occupancy */
+    #occ-today { font-size:0.75rem; color:#8b949e; margin-top:4px; }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>Wi-Fi Radar <span>ALPHA</span></h1>
+  <h1>Wi-Fi Radar <span class="badge">{{ device_name }}</span></h1>
   <div id="status-badge">
     <div id="status-dot"></div>
     <span id="status-text">Connecting...</span>
   </div>
+  <div class="header-actions">
+    <a href="/config" class="btn">Config</a>
+    <button class="btn" id="btn-export">Export CSV</button>
+    <button class="btn" id="btn-playback-toggle">Playback</button>
+  </div>
 </header>
 
-<div class="stats">
+<!-- Fall alert banner -->
+<div id="fall-banner">
+  <span id="fall-msg">⚠ Possible fall detected!</span>
+  <button id="fall-dismiss">✕</button>
+</div>
+
+<!-- Stats row 1: core -->
+<div class="stats" style="margin-bottom:10px;">
   <div class="stat-card">
-    <div class="label">Packets Captured</div>
+    <div class="label">Packets</div>
     <div class="value" id="stat-packets">—</div>
   </div>
   <div class="stat-card">
@@ -189,201 +119,515 @@
   </div>
 </div>
 
-<div class="charts">
-  <!-- Heatmap -->
+<!-- Stats row 2: direction/speed/breathing -->
+<div class="stats section">
+  <div class="stat-card">
+    <div class="label">Direction</div>
+    <div class="value sm" id="stat-direction">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Speed</div>
+    <div class="value sm" id="stat-speed">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Breathing / Micro-motion</div>
+    <div class="value sm" id="stat-breathing">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Occupancy Today</div>
+    <div class="value sm ok" id="stat-occ">—</div>
+    <div id="occ-today"></div>
+  </div>
+</div>
+
+<!-- Historical playback panel -->
+<div id="playback-panel" class="chart-card section">
+  <h2>Historical Playback
+    <button class="btn" id="btn-play" style="font-size:0.75rem;padding:3px 10px;">▶ Play</button>
+  </h2>
+  <div class="playback-controls">
+    <label style="font-size:0.78rem;color:#8b949e;">From</label>
+    <input type="datetime-local" id="pb-from" />
+    <label style="font-size:0.78rem;color:#8b949e;">To</label>
+    <input type="datetime-local" id="pb-to" />
+    <button class="btn" id="btn-pb-load">Load</button>
+  </div>
+  <div class="playback-controls">
+    <input type="range" id="pb-scrubber" min="0" max="100" value="0" />
+    <span id="playback-ts">—</span>
+  </div>
+  <div id="pb-rssi-chart" style="height:180px;"></div>
+</div>
+
+<!-- Heatmap with alert zone drawing -->
+<div class="chart-card section">
+  <h2>Signal Heatmap — last 120s
+    <button class="btn" id="btn-add-zone" style="font-size:0.75rem;padding:3px 10px;">+ Alert Zone</button>
+  </h2>
+  <div id="heatmap" style="height:280px;"></div>
+  <div id="zone-instructions">Select a region on the heatmap to define an alert zone, or click "+ Alert Zone" to add one by RSSI range.</div>
+  <div id="zone-form">
+    <input id="zone-name" placeholder="Zone name" style="width:130px;" />
+    <input id="zone-rssi-min" type="number" placeholder="RSSI min (e.g. -65)" />
+    <input id="zone-rssi-max" type="number" placeholder="RSSI max (e.g. -45)" />
+    <button class="btn" id="btn-save-zone">Save Zone</button>
+    <button class="btn btn-danger" id="btn-cancel-zone">Cancel</button>
+  </div>
+  <div id="active-zones" style="margin-top:8px;font-size:0.78rem;color:#8b949e;"></div>
+</div>
+
+<div class="row2 section">
+  <!-- RSSI line chart -->
   <div class="chart-card">
-    <h2>Signal Heatmap — Time vs RSSI Bucket (last 120s)</h2>
-    <div id="heatmap" style="height:280px;"></div>
+    <h2>Live RSSI Signal</h2>
+    <div id="rssi-chart" style="height:220px;"></div>
   </div>
 
-  <div class="chart-row">
-    <!-- RSSI line -->
-    <div class="chart-card">
-      <h2>Live RSSI Signal</h2>
-      <div id="rssi-chart" style="height:220px;"></div>
-    </div>
+  <!-- Occupancy chart -->
+  <div class="chart-card">
+    <h2>Room Occupancy (last 7 days)</h2>
+    <div id="occ-chart" style="height:220px;"></div>
+  </div>
+</div>
 
-    <!-- Movement log -->
-    <div class="movement-log">
-      <h2>Movement Log</h2>
-      <div id="event-log"><span id="no-events">No movement detected yet.</span></div>
-    </div>
+<!-- Movement log -->
+<div class="row2 section">
+  <div class="movement-log">
+    <h2>Movement &amp; Fall Log</h2>
+    <div id="event-log"><span id="no-events">No movement detected yet.</span></div>
+  </div>
+  <div class="movement-log">
+    <h2>Zone Alerts</h2>
+    <div id="zone-log"><span style="font-size:0.8rem;color:#484f58;">No zone alerts.</span></div>
   </div>
 </div>
 
 <script>
-  // -----------------------------------------------------------------------
-  // Chart layout defaults
-  // -----------------------------------------------------------------------
-  const darkBg   = "#161b22";
-  const gridCol  = "#21262d";
-  const textCol  = "#8b949e";
+// -----------------------------------------------------------------------
+// Chart layout helpers
+// -----------------------------------------------------------------------
+const darkBg  = "#161b22";
+const gridCol = "#21262d";
+const textCol = "#8b949e";
+const base = {
+  paper_bgcolor: darkBg, plot_bgcolor: darkBg,
+  font: { color: textCol, size: 11 },
+  margin: { t:10, r:10, b:40, l:50 },
+  xaxis: { gridcolor: gridCol, zerolinecolor: gridCol },
+  yaxis: { gridcolor: gridCol, zerolinecolor: gridCol },
+};
 
-  const baseLayout = {
-    paper_bgcolor: darkBg,
-    plot_bgcolor:  darkBg,
-    font:  { color: textCol, size: 11 },
-    margin: { t: 10, r: 10, b: 40, l: 50 },
-    xaxis: { gridcolor: gridCol, zerolinecolor: gridCol },
-    yaxis: { gridcolor: gridCol, zerolinecolor: gridCol },
-  };
+// -----------------------------------------------------------------------
+// Init charts
+// -----------------------------------------------------------------------
+Plotly.newPlot("heatmap", [{
+  type:"heatmap", z:[],
+  colorscale:[[0,"#0d1117"],[0.01,"#1f3a5f"],[0.3,"#1f6feb"],[0.6,"#f0883e"],[1,"#f85149"]],
+  showscale:true,
+  colorbar:{thickness:12,outlinewidth:0,tickfont:{color:textCol,size:10}},
+  hovertemplate:"Time: %{x}s ago<br>RSSI: %{y} dBm<br>Count: %{z}<extra></extra>",
+}], {
+  ...base,
+  xaxis:{...base.xaxis,title:"Seconds ago",autorange:"reversed"},
+  yaxis:{...base.yaxis,title:"RSSI (dBm)"},
+  margin:{t:10,r:80,b:50,l:60},
+  dragmode:"select",
+}, { responsive:true, displayModeBar:true, modeBarButtonsToRemove:["lasso2d","zoom2d","pan2d"] });
 
-  // -----------------------------------------------------------------------
-  // Initialise charts (empty)
-  // -----------------------------------------------------------------------
+Plotly.newPlot("rssi-chart", [
+  { y:[], type:"scatter", mode:"lines", name:"Raw",     line:{color:"#1f6feb",width:1}, opacity:0.6 },
+  { y:[], type:"scatter", mode:"lines", name:"Smoothed",line:{color:"#58a6ff",width:2} },
+], {
+  ...base,
+  yaxis:{...base.yaxis,title:"dBm",range:[-100,-20]},
+  xaxis:{...base.xaxis,showticklabels:false},
+  legend:{font:{color:textCol,size:10},bgcolor:"transparent"},
+  margin:{t:10,r:10,b:30,l:50},
+}, { responsive:true, displayModeBar:false });
 
-  // Heatmap
-  Plotly.newPlot("heatmap", [{
-    type: "heatmap",
-    z: [],
-    colorscale: [
-      [0,    "#0d1117"],
-      [0.01, "#1f3a5f"],
-      [0.3,  "#1f6feb"],
-      [0.6,  "#f0883e"],
-      [1,    "#f85149"],
-    ],
-    showscale: true,
-    colorbar: { thickness: 12, outlinewidth: 0, tickfont: { color: textCol, size: 10 } },
-    hovertemplate: "Time: %{x}s ago<br>RSSI: %{y} dBm<br>Count: %{z}<extra></extra>",
-  }], {
-    ...baseLayout,
-    xaxis: { ...baseLayout.xaxis, title: "Seconds ago", autorange: "reversed" },
-    yaxis: { ...baseLayout.yaxis, title: "RSSI (dBm)" },
-    margin: { t: 10, r: 80, b: 50, l: 60 },
-  }, { responsive: true, displayModeBar: false });
+Plotly.newPlot("pb-rssi-chart", [
+  { y:[], type:"scatter", mode:"lines", name:"RSSI",    line:{color:"#1f6feb",width:1} },
+  { y:[], type:"scatter", mode:"lines", name:"Smoothed",line:{color:"#58a6ff",width:1.5} },
+  { x:[], y:[], type:"scatter", mode:"markers", name:"Events",
+    marker:{color:"#f85149",size:8,symbol:"triangle-up"} },
+], {
+  ...base,
+  yaxis:{...base.yaxis,title:"dBm",range:[-100,-20]},
+  xaxis:{...base.xaxis,title:"Time"},
+  legend:{font:{color:textCol,size:10},bgcolor:"transparent"},
+  margin:{t:10,r:10,b:40,l:50},
+}, { responsive:true, displayModeBar:false });
 
-  // RSSI line chart
-  Plotly.newPlot("rssi-chart", [
-    { y: [], type: "scatter", mode: "lines", name: "Raw",
-      line: { color: "#1f6feb", width: 1 }, opacity: 0.6 },
-    { y: [], type: "scatter", mode: "lines", name: "Smoothed",
-      line: { color: "#58a6ff", width: 2 } },
-  ], {
-    ...baseLayout,
-    yaxis: { ...baseLayout.yaxis, title: "dBm", range: [-100, -20] },
-    xaxis: { ...baseLayout.xaxis, title: "Samples", showticklabels: false },
-    legend: { font: { color: textCol, size: 10 }, bgcolor: "transparent" },
-    margin: { t: 10, r: 10, b: 30, l: 50 },
-  }, { responsive: true, displayModeBar: false });
+Plotly.newPlot("occ-chart", [{
+  type:"bar", x:[], y:[], marker:{color:"#238636"},
+  hovertemplate:"%{x}: %{y:.1f}h<extra></extra>",
+}], {
+  ...base,
+  yaxis:{...base.yaxis,title:"Hours",rangemode:"tozero"},
+  xaxis:{...base.xaxis,title:"Date"},
+  margin:{t:10,r:10,b:60,l:50},
+}, { responsive:true, displayModeBar:false });
 
-  // -----------------------------------------------------------------------
-  // Simple moving average
-  // -----------------------------------------------------------------------
-  function smooth(arr, w = 5) {
-    return arr.map((_, i) => {
-      const slice = arr.slice(Math.max(0, i - w + 1), i + 1);
-      return slice.reduce((a, b) => a + b, 0) / slice.length;
-    });
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+function smooth(arr, w=5) {
+  return arr.map((_,i)=>{
+    const sl=arr.slice(Math.max(0,i-w+1),i+1);
+    return sl.reduce((a,b)=>a+b,0)/sl.length;
+  });
+}
+
+const dirIcons = { approaching:"↗ Approaching", moving_away:"↘ Moving away", stationary:"→ Stationary", unknown:"—" };
+const spdColors = { stationary:"#8b949e", slow:"#58a6ff", medium:"#d29922", fast:"#f85149" };
+
+// -----------------------------------------------------------------------
+// Occupancy fetch
+// -----------------------------------------------------------------------
+function fetchOccupancy() {
+  fetch("/api/occupancy?days=7").then(r=>r.json()).then(data=>{
+    if (!data.length) return;
+    const dates = data.map(d=>d.date);
+    const hours = data.map(d=>d.hours);
+    Plotly.react("occ-chart", [{
+      type:"bar", x:dates, y:hours,
+      marker:{color:"#238636"},
+      hovertemplate:"%{x}: %{y:.1f}h<extra></extra>",
+    }], {
+      ...base,
+      yaxis:{...base.yaxis,title:"Hours",rangemode:"tozero"},
+      xaxis:{...base.xaxis},
+      margin:{t:10,r:10,b:60,l:50},
+    }, {responsive:true,displayModeBar:false});
+    // Update today stat
+    const today = new Date().toISOString().slice(0,10);
+    const todayEntry = data.find(d=>d.date===today);
+    if (todayEntry) {
+      document.getElementById("stat-occ").textContent = todayEntry.hours.toFixed(1)+"h";
+    }
+  }).catch(()=>{});
+}
+fetchOccupancy();
+setInterval(fetchOccupancy, 60000);
+
+// -----------------------------------------------------------------------
+// SSE — live state
+// -----------------------------------------------------------------------
+let lastEventCount = 0;
+let lastFallCount  = 0;
+let lastZoneCount  = 0;
+
+const es = new EventSource("/stream");
+
+es.onmessage = (e) => {
+  let data;
+  try { data = JSON.parse(e.data); } catch { return; }
+  if (!data || !data.rssi) return;
+
+  // Status dot
+  const dot = document.getElementById("status-dot");
+  const txt = document.getElementById("status-text");
+  const events = data.movement_events || [];
+  const recentMovement = events.length > lastEventCount;
+
+  if (recentMovement) {
+    dot.className = "movement";
+    txt.textContent = "Movement Detected!";
+    setTimeout(()=>{ dot.className="active"; txt.textContent="Monitoring"; }, 2000);
+  } else if (!data.calibrated) {
+    dot.className = "calibrating";
+    txt.textContent = `Calibrating (${data.rssi.length} samples)`;
+  } else {
+    dot.className = "active";
+    txt.textContent = "Monitoring";
   }
 
-  // -----------------------------------------------------------------------
-  // SSE stream
-  // -----------------------------------------------------------------------
-  let lastEventCount = 0;
+  // Stats
+  document.getElementById("stat-packets").textContent = (data.packet_count||0).toLocaleString();
+  document.getElementById("stat-rssi").textContent = data.current_rssi!=null ? `${data.current_rssi} dBm` : "— dBm";
+  document.getElementById("stat-events").textContent = events.length;
+  const statusEl = document.getElementById("stat-status");
+  statusEl.textContent = data.calibrated ? "Active" : "Calibrating";
+  statusEl.className   = `value ${data.calibrated ? "ok" : ""}`;
 
-  const es = new EventSource("/stream");
+  // Direction / speed
+  const dir = data.direction || "unknown";
+  const spd = data.speed     || "unknown";
+  document.getElementById("stat-direction").textContent = dirIcons[dir] || dir;
+  const spdEl = document.getElementById("stat-speed");
+  spdEl.textContent = spd.charAt(0).toUpperCase() + spd.slice(1);
+  spdEl.style.color = spdColors[spd] || "#e6edf3";
 
-  es.onmessage = (e) => {
-    let data;
-    try { data = JSON.parse(e.data); } catch { return; }
-    if (!data || !data.rssi) return;
+  // Breathing
+  const bEl = document.getElementById("stat-breathing");
+  if (data.breathing_detected) {
+    const bpm = data.breathing_freq_hz ? Math.round(data.breathing_freq_hz * 60) : "?";
+    bEl.textContent = `Detected ~${bpm} brpm`;
+    bEl.className   = "value sm ok";
+  } else if (data.heartbeat_detected) {
+    const hbpm = data.heartbeat_freq_hz ? Math.round(data.heartbeat_freq_hz * 60) : "?";
+    bEl.textContent = `HB ~${hbpm} bpm`;
+    bEl.className   = "value sm ok";
+  } else {
+    bEl.textContent = "—";
+    bEl.className   = "value sm";
+  }
 
-    // --- Status ---
-    const dot  = document.getElementById("status-dot");
-    const txt  = document.getElementById("status-text");
-    const recentMovement = data.movement_events.length > lastEventCount;
+  // Fall alert banner
+  const falls = data.fall_events || [];
+  if (falls.length > lastFallCount) {
+    lastFallCount = falls.length;
+    const banner = document.getElementById("fall-banner");
+    const last = falls[falls.length-1];
+    document.getElementById("fall-msg").textContent =
+      `⚠ Possible fall detected at ${new Date(last.ts*1000).toLocaleTimeString()} (z=${last.z_score})`;
+    banner.classList.add("visible");
+  }
 
-    if (recentMovement) {
-      dot.className = "movement";
-      txt.textContent = "Movement Detected!";
-      setTimeout(() => {
-        dot.className = "active";
-        txt.textContent = "Monitoring";
-      }, 2000);
-    } else if (!data.calibrated) {
-      dot.className = "calibrating";
-      txt.textContent = `Calibrating (${data.rssi.length} samples)`;
-    } else {
-      dot.className = "active";
-      txt.textContent = "Monitoring";
-    }
+  // Heatmap
+  if (data.heatmap && data.heatmap.matrix.length) {
+    const hm = data.heatmap;
+    const xTicks = Array.from({length:hm.n_time}, (_,i)=>hm.window-i);
+    Plotly.react("heatmap", [{
+      type:"heatmap", z:hm.matrix, x:xTicks, y:hm.y_labels,
+      colorscale:[[0,"#0d1117"],[0.01,"#1f3a5f"],[0.3,"#1f6feb"],[0.6,"#f0883e"],[1,"#f85149"]],
+      showscale:true,
+      colorbar:{thickness:12,outlinewidth:0,tickfont:{color:textCol,size:10}},
+      hovertemplate:"Time: %{x}s ago<br>RSSI: %{y} dBm<br>Count: %{z}<extra></extra>",
+    }], {
+      ...base,
+      xaxis:{...base.xaxis,title:"Seconds ago",autorange:"reversed"},
+      yaxis:{...base.yaxis,title:"RSSI (dBm)"},
+      margin:{t:10,r:80,b:50,l:60},
+      dragmode:"select",
+    }, {responsive:true,displayModeBar:true,modeBarButtonsToRemove:["lasso2d","zoom2d","pan2d"]});
+  }
 
-    // --- Stats ---
-    document.getElementById("stat-packets").textContent =
-      data.packet_count.toLocaleString();
-    document.getElementById("stat-rssi").textContent =
-      data.current_rssi !== null ? `${data.current_rssi} dBm` : "— dBm";
-    document.getElementById("stat-events").textContent =
-      data.movement_events.length;
+  // RSSI line
+  if (data.rssi.length) {
+    Plotly.react("rssi-chart", [
+      { y:data.rssi, type:"scatter", mode:"lines", name:"Raw", line:{color:"#1f6feb",width:1}, opacity:0.6 },
+      { y:smooth(data.rssi), type:"scatter", mode:"lines", name:"Smoothed", line:{color:"#58a6ff",width:2} },
+    ], {
+      ...base,
+      yaxis:{...base.yaxis,title:"dBm",range:[-100,-20]},
+      xaxis:{...base.xaxis,showticklabels:false},
+      legend:{font:{color:textCol,size:10},bgcolor:"transparent"},
+      margin:{t:10,r:10,b:30,l:50},
+    }, {responsive:true,displayModeBar:false});
+  }
 
-    const statusEl = document.getElementById("stat-status");
-    statusEl.textContent = data.calibrated ? "Active" : "Calibrating";
-    statusEl.className   = `value ${data.calibrated ? "ok" : ""}`;
+  // Movement log
+  if (events.length !== lastEventCount || falls.length !== lastFallCount) {
+    lastEventCount = events.length;
+    const log = document.getElementById("event-log");
+    const noEvt = document.getElementById("no-events");
+    if (noEvt) noEvt.remove();
 
-    // --- Heatmap ---
-    if (data.heatmap && data.heatmap.matrix.length) {
-      const hm = data.heatmap;
-      const xTicks = Array.from({ length: hm.n_time }, (_, i) => hm.window - i);
-      Plotly.react("heatmap", [{
-        type: "heatmap",
-        z: hm.matrix,
-        x: xTicks,
-        y: hm.y_labels,
-        colorscale: [
-          [0,    "#0d1117"],
-          [0.01, "#1f3a5f"],
-          [0.3,  "#1f6feb"],
-          [0.6,  "#f0883e"],
-          [1,    "#f85149"],
-        ],
-        showscale: true,
-        colorbar: { thickness: 12, outlinewidth: 0, tickfont: { color: textCol, size: 10 } },
-        hovertemplate: "Time: %{x}s ago<br>RSSI: %{y} dBm<br>Count: %{z}<extra></extra>",
-      }], {
-        ...baseLayout,
-        xaxis: { ...baseLayout.xaxis, title: "Seconds ago", autorange: "reversed" },
-        yaxis: { ...baseLayout.yaxis, title: "RSSI (dBm)" },
-        margin: { t: 10, r: 80, b: 50, l: 60 },
-      }, { responsive: true, displayModeBar: false });
-    }
+    const allEvents = [
+      ...events.map(e => ({ ts: e.ts||e, type:"movement", z: e.z_score })),
+      ...falls.map(f  => ({ ts: f.ts,    type:"fall",     z: f.z_score })),
+    ].sort((a,b) => b.ts - a.ts).slice(0, 60);
 
-    // --- RSSI line ---
-    const rssi = data.rssi;
-    if (rssi.length) {
-      Plotly.react("rssi-chart", [
-        { y: rssi, type: "scatter", mode: "lines", name: "Raw",
-          line: { color: "#1f6feb", width: 1 }, opacity: 0.6 },
-        { y: smooth(rssi), type: "scatter", mode: "lines", name: "Smoothed",
-          line: { color: "#58a6ff", width: 2 } },
-      ], {
-        ...baseLayout,
-        yaxis: { ...baseLayout.yaxis, title: "dBm", range: [-100, -20] },
-        xaxis: { ...baseLayout.xaxis, showticklabels: false },
-        legend: { font: { color: textCol, size: 10 }, bgcolor: "transparent" },
-        margin: { t: 10, r: 10, b: 30, l: 50 },
-      }, { responsive: true, displayModeBar: false });
-    }
+    log.innerHTML = allEvents.map(ev => {
+      const timeStr = new Date(ev.ts*1000).toLocaleTimeString();
+      const cls = ev.type==="fall" ? "log-entry fall" : "log-entry";
+      const icon = ev.type==="fall" ? "⚠ FALL" : "⚠ Movement";
+      const zStr = ev.z ? ` z=${ev.z}` : "";
+      return `<div class="${cls}"><span class="ts">${timeStr}</span><span>${icon}${zStr}</span></div>`;
+    }).join("");
+  }
 
-    // --- Movement log ---
-    if (data.movement_events.length !== lastEventCount) {
-      lastEventCount = data.movement_events.length;
-      const log = document.getElementById("event-log");
-      const noEvt = document.getElementById("no-events");
-      if (noEvt) noEvt.remove();
+  // Zone alerts
+  const zAlerts = data.zone_alerts || [];
+  if (zAlerts.length !== lastZoneCount) {
+    lastZoneCount = zAlerts.length;
+    const zLog = document.getElementById("zone-log");
+    zLog.innerHTML = [...zAlerts].reverse().slice(0,30).map(za => {
+      const timeStr = new Date(za.ts*1000).toLocaleTimeString();
+      return `<div class="log-entry zone"><span class="ts">${timeStr}</span><span>Zone: ${za.zone} (${za.rssi} dBm)</span></div>`;
+    }).join("") || '<span style="font-size:0.8rem;color:#484f58;">No zone alerts.</span>';
+  }
+};
 
-      log.innerHTML = [...data.movement_events].reverse().map(ts => {
-        const d = new Date(ts * 1000);
-        const timeStr = d.toLocaleTimeString();
-        return `<div class="log-entry"><span class="ts">${timeStr}</span><span>⚠ Movement detected</span></div>`;
-      }).join("");
-    }
-  };
+es.onerror = () => {
+  document.getElementById("status-dot").className = "";
+  document.getElementById("status-text").textContent = "Disconnected";
+};
 
-  es.onerror = () => {
-    document.getElementById("status-dot").className = "";
-    document.getElementById("status-text").textContent = "Disconnected";
-  };
+// -----------------------------------------------------------------------
+// Fall banner dismiss
+// -----------------------------------------------------------------------
+document.getElementById("fall-dismiss").onclick = () => {
+  document.getElementById("fall-banner").classList.remove("visible");
+};
+
+// -----------------------------------------------------------------------
+// Export CSV
+// -----------------------------------------------------------------------
+document.getElementById("btn-export").onclick = () => {
+  const since = Math.floor(Date.now()/1000 - 86400);
+  window.location = `/export/csv?since=${since}`;
+};
+
+// -----------------------------------------------------------------------
+// Alert zone editor
+// -----------------------------------------------------------------------
+let alertZones = [];
+const zoneForm     = document.getElementById("zone-form");
+const activeZonesEl = document.getElementById("active-zones");
+
+function renderZones() {
+  if (!alertZones.length) { activeZonesEl.textContent = "No alert zones defined."; return; }
+  activeZonesEl.innerHTML = alertZones.map((z,i) =>
+    `<span style="margin-right:8px;background:#1f3a5f;border-radius:3px;padding:2px 6px;">
+      ${z.name} [${z.rssi_min} to ${z.rssi_max} dBm]
+      <button onclick="removeZone(${i})" style="background:none;border:none;color:#f85149;cursor:pointer;margin-left:4px;">✕</button>
+    </span>`
+  ).join("");
+}
+
+window.removeZone = function(idx) {
+  alertZones.splice(idx, 1);
+  renderZones();
+  saveZones();
+};
+
+function saveZones() {
+  fetch("/api/zones", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(alertZones),
+  });
+}
+
+document.getElementById("btn-add-zone").onclick = () => {
+  zoneForm.classList.toggle("visible");
+};
+document.getElementById("btn-cancel-zone").onclick = () => {
+  zoneForm.classList.remove("visible");
+};
+document.getElementById("btn-save-zone").onclick = () => {
+  const name   = document.getElementById("zone-name").value.trim() || "Zone "+(alertZones.length+1);
+  const rMin   = parseFloat(document.getElementById("zone-rssi-min").value);
+  const rMax   = parseFloat(document.getElementById("zone-rssi-max").value);
+  if (isNaN(rMin)||isNaN(rMax)) { alert("Enter valid RSSI values."); return; }
+  alertZones.push({ name, rssi_min: Math.min(rMin,rMax), rssi_max: Math.max(rMin,rMax) });
+  renderZones();
+  saveZones();
+  zoneForm.classList.remove("visible");
+};
+
+// Heatmap selection → auto-populate zone form
+document.getElementById("heatmap").on("plotly_selected", function(eventData) {
+  if (!eventData || !eventData.range) return;
+  const rMin = Math.floor(eventData.range.y[0]);
+  const rMax = Math.ceil(eventData.range.y[1]);
+  document.getElementById("zone-rssi-min").value = Math.min(rMin,rMax);
+  document.getElementById("zone-rssi-max").value = Math.max(rMin,rMax);
+  zoneForm.classList.add("visible");
+});
+
+// Load existing zones from server
+fetch("/config").then(r=>r.text()).then(html=>{
+  const m = html.match(/id="cfg-zones-data"[^>]*>([^<]*)</);
+  if (m) {
+    try { alertZones = JSON.parse(decodeURIComponent(m[1])); renderZones(); } catch{}
+  }
+}).catch(()=>{});
+fetch("/api/state").then(r=>r.json()).catch(()=>null);
+
+// -----------------------------------------------------------------------
+// Historical playback
+// -----------------------------------------------------------------------
+const playbackPanel = document.getElementById("playback-panel");
+let pbData = null;
+let pbPlaying = false;
+let pbPlayInterval = null;
+
+document.getElementById("btn-playback-toggle").onclick = () => {
+  playbackPanel.classList.toggle("visible");
+  if (playbackPanel.classList.contains("visible")) {
+    // Default: last hour
+    const now  = new Date();
+    const from = new Date(now - 3600000);
+    document.getElementById("pb-to").value   = toLocalDateTimeInput(now);
+    document.getElementById("pb-from").value = toLocalDateTimeInput(from);
+  }
+};
+
+function toLocalDateTimeInput(d) {
+  const pad = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+document.getElementById("btn-pb-load").onclick = async () => {
+  const fromVal = document.getElementById("pb-from").value;
+  const toVal   = document.getElementById("pb-to").value;
+  if (!fromVal || !toVal) { alert("Select a time range."); return; }
+  const since = Math.floor(new Date(fromVal).getTime()/1000);
+  const until = Math.floor(new Date(toVal).getTime()/1000);
+  const resp  = await fetch(`/api/history?since=${since}&until=${until}&limit=5000`);
+  pbData = await resp.json();
+  const n = pbData.rssi.length;
+  document.getElementById("pb-scrubber").max = Math.max(0, n-1);
+  document.getElementById("pb-scrubber").value = 0;
+  renderPlaybackAt(0);
+};
+
+document.getElementById("pb-scrubber").oninput = function() {
+  if (pbData) renderPlaybackAt(parseInt(this.value));
+};
+
+function renderPlaybackAt(idx) {
+  if (!pbData || !pbData.rssi.length) return;
+  const window_size = 200;
+  const start = Math.max(0, idx - window_size);
+  const slice = pbData.rssi.slice(start, idx+1);
+  const eventsInWindow = (pbData.events||[]).filter(e=>e.ts <= pbData.rssi[idx].ts);
+
+  const times  = slice.map(r => new Date(r.ts*1000).toLocaleTimeString());
+  const rssiV  = slice.map(r => r.rssi);
+  const smthV  = slice.map(r => r.smoothed||r.rssi);
+  const evtTs  = eventsInWindow.map(e => new Date(e.ts*1000).toLocaleTimeString());
+  const evtY   = eventsInWindow.map(() => -50);
+
+  Plotly.react("pb-rssi-chart", [
+    { x:times, y:rssiV, type:"scatter", mode:"lines", name:"RSSI",    line:{color:"#1f6feb",width:1} },
+    { x:times, y:smthV, type:"scatter", mode:"lines", name:"Smoothed",line:{color:"#58a6ff",width:1.5} },
+    { x:evtTs, y:evtY,  type:"scatter", mode:"markers", name:"Events",
+      marker:{color:"#f85149",size:8,symbol:"triangle-up"} },
+  ], {
+    ...base,
+    yaxis:{...base.yaxis,title:"dBm",range:[-100,-20]},
+    xaxis:{...base.xaxis,title:"Time"},
+    legend:{font:{color:textCol,size:10},bgcolor:"transparent"},
+    margin:{t:10,r:10,b:40,l:50},
+  }, {responsive:true,displayModeBar:false});
+
+  const curr = pbData.rssi[idx];
+  document.getElementById("playback-ts").textContent = curr ? new Date(curr.ts*1000).toLocaleString() : "—";
+}
+
+document.getElementById("btn-play").onclick = function() {
+  if (pbPlaying) {
+    clearInterval(pbPlayInterval);
+    pbPlaying = false;
+    this.textContent = "▶ Play";
+    return;
+  }
+  if (!pbData) { alert("Load data first."); return; }
+  pbPlaying = true;
+  this.textContent = "⏸ Pause";
+  const scrubber = document.getElementById("pb-scrubber");
+  pbPlayInterval = setInterval(() => {
+    const cur = parseInt(scrubber.value);
+    const max = parseInt(scrubber.max);
+    if (cur >= max) { clearInterval(pbPlayInterval); pbPlaying=false; document.getElementById("btn-play").textContent="▶ Play"; return; }
+    scrubber.value = cur+1;
+    renderPlaybackAt(cur+1);
+  }, 100);
+};
 </script>
 </body>
 </html>

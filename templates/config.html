@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wi-Fi Radar — Config</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:#0d1117; color:#e6edf3; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; min-height:100vh; padding:20px; max-width:720px; margin:0 auto; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    h1 { font-size:1.3rem; font-weight:600; color:#58a6ff; }
+    a.back { background:#161b22; border:1px solid #30363d; color:#8b949e; border-radius:6px; padding:6px 14px; font-size:0.8rem; cursor:pointer; text-decoration:none; }
+    a.back:hover { border-color:#58a6ff; color:#58a6ff; }
+
+    .section { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:20px; margin-bottom:16px; }
+    .section h2 { font-size:0.85rem; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:.05em; margin-bottom:16px; }
+
+    .field { margin-bottom:14px; }
+    .field label { display:block; font-size:0.8rem; color:#8b949e; margin-bottom:5px; }
+    .field input[type=text], .field input[type=number], .field input[type=password], .field input[type=url] {
+      width:100%; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:5px; padding:8px 10px; font-size:0.85rem;
+    }
+    .field input:focus { outline:none; border-color:#58a6ff; }
+    .field .hint { font-size:0.73rem; color:#484f58; margin-top:3px; }
+    .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    .toggle { display:flex; align-items:center; gap:10px; }
+    .toggle input[type=checkbox] { width:16px; height:16px; accent-color:#58a6ff; cursor:pointer; }
+    .toggle label { font-size:0.85rem; color:#e6edf3; cursor:pointer; }
+
+    /* Zones table */
+    #zones-list { margin-bottom:10px; }
+    .zone-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.82rem; }
+    .zone-row input { background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:4px; padding:5px 8px; font-size:0.8rem; }
+    .zone-row button { background:none; border:none; color:#f85149; cursor:pointer; font-size:1rem; }
+    #btn-add-zone-row { background:none; border:1px dashed #30363d; color:#58a6ff; border-radius:5px; padding:5px 12px; font-size:0.78rem; cursor:pointer; }
+    #btn-add-zone-row:hover { border-color:#58a6ff; }
+
+    /* Save button */
+    .save-bar { position:sticky; bottom:0; background:#0d1117; padding:14px 0; border-top:1px solid #21262d; display:flex; gap:10px; align-items:center; }
+    .btn-save { background:#1f6feb; border:none; color:#fff; border-radius:6px; padding:10px 28px; font-size:0.9rem; font-weight:600; cursor:pointer; }
+    .btn-save:hover { background:#388bfd; }
+    #save-status { font-size:0.82rem; color:#3fb950; }
+
+    /* HA test */
+    #ha-test-result { font-size:0.8rem; margin-top:6px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Wi-Fi Radar — Configuration</h1>
+  <a class="back" href="/">← Dashboard</a>
+</header>
+
+<!-- Hidden data for JS to read current config -->
+<script id="cfg-data" type="application/json">{{ cfg | tojson }}</script>
+
+<!-- Hardware -->
+<div class="section">
+  <h2>Hardware</h2>
+  <div class="field-row">
+    <div class="field">
+      <label>RX Interface</label>
+      <input type="text" id="f-interface" placeholder="wlan0" />
+      <div class="hint">Monitor mode interface (RX). Usually wlan0 or wlan1.</div>
+    </div>
+    <div class="field">
+      <label>TX Interface (optional)</label>
+      <input type="text" id="f-tx-interface" placeholder="wlan1" />
+      <div class="hint">Second adapter for active TX probe injection (much better accuracy).</div>
+    </div>
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label>WiFi Channel (blank = all)</label>
+      <input type="number" id="f-channel" placeholder="6" min="1" max="13" />
+    </div>
+    <div class="field">
+      <label>Dashboard Port</label>
+      <input type="number" id="f-port" placeholder="5000" min="1024" max="65535" />
+    </div>
+  </div>
+  <div class="field">
+    <label>Device Name</label>
+    <input type="text" id="f-device-name" placeholder="e.g. living-room-pi" />
+  </div>
+</div>
+
+<!-- Detection -->
+<div class="section">
+  <h2>Detection</h2>
+  <div class="field-row">
+    <div class="field">
+      <label>Sensitivity (z-score threshold)</label>
+      <input type="number" id="f-sensitivity" step="0.1" min="0.5" max="10" />
+      <div class="hint">Lower = more sensitive. Default: 2.0. Increase if too many false positives.</div>
+    </div>
+    <div class="field">
+      <label>Fall detection multiplier</label>
+      <input type="number" id="f-fall-mult" step="0.1" min="1" max="20" />
+      <div class="hint">Sensitivity × this = fall threshold. Default: 3.0.</div>
+    </div>
+  </div>
+  <div class="field-row" style="margin-bottom:10px;">
+    <div class="toggle">
+      <input type="checkbox" id="f-breathing" />
+      <label for="f-breathing">Breathing / micro-motion detection (FFT)</label>
+    </div>
+    <div class="toggle">
+      <input type="checkbox" id="f-fp-filter" />
+      <label for="f-fp-filter">False-positive filter (suppress microwave interference)</label>
+    </div>
+  </div>
+  <div class="toggle">
+    <input type="checkbox" id="f-occupancy" />
+    <label for="f-occupancy">Occupancy tracking (log daily room usage to SQLite)</label>
+  </div>
+</div>
+
+<!-- Alert Zones -->
+<div class="section">
+  <h2>Alert Zones</h2>
+  <p style="font-size:0.8rem;color:#8b949e;margin-bottom:12px;">Zones defined by RSSI range. An alert is fired when movement is detected within the zone's RSSI range (rough proximity indicator).</p>
+  <div id="zones-list"></div>
+  <button id="btn-add-zone-row">+ Add Zone</button>
+</div>
+
+<!-- Home Assistant -->
+<div class="section">
+  <h2>Home Assistant Integration</h2>
+  <div class="field">
+    <label>Webhook URL</label>
+    <input type="url" id="f-ha-url" placeholder="https://your-ha.duckdns.org/api/webhook/wifi-radar-abc123" />
+    <div class="hint">Create an automation in HA with a webhook trigger. Events: movement, fall, zone_alert, test.</div>
+  </div>
+  <div class="field">
+    <label>Long-lived Access Token (optional)</label>
+    <input type="password" id="f-ha-token" placeholder="eyJ0..." />
+    <div class="hint">Only needed if your HA webhook requires authentication.</div>
+  </div>
+  <button class="btn-save" id="btn-ha-test" style="background:#238636;margin-top:4px;">Test Webhook</button>
+  <div id="ha-test-result"></div>
+</div>
+
+<!-- Vercel hub -->
+<div class="section">
+  <h2>Vercel Hub (multi-device)</h2>
+  <div class="field-row">
+    <div class="field">
+      <label>Vercel App URL</label>
+      <input type="url" id="f-vercel-url" placeholder="https://your-app.vercel.app" />
+    </div>
+    <div class="toggle" style="align-self:flex-end;padding-bottom:4px;">
+      <input type="checkbox" id="f-auto-tunnel" />
+      <label for="f-auto-tunnel">Auto-start cloudflared tunnel</label>
+    </div>
+  </div>
+</div>
+
+<!-- Data -->
+<div class="section">
+  <h2>Data Retention</h2>
+  <div class="field">
+    <label>Keep RSSI history for (days)</label>
+    <input type="number" id="f-retention" min="1" max="365" />
+    <div class="hint">Older data is pruned automatically. Default: 7.</div>
+  </div>
+</div>
+
+<div class="save-bar">
+  <button class="btn-save" id="btn-save">Save Configuration</button>
+  <span id="save-status"></span>
+</div>
+
+<script>
+// Load current config into form
+const cfg = JSON.parse(document.getElementById("cfg-data").textContent || "{}");
+
+function val(id, key, fallback="") {
+  const el = document.getElementById(id);
+  const v  = cfg[key] ?? fallback;
+  if (el.type === "checkbox") el.checked = !!v;
+  else el.value = v !== null && v !== undefined ? v : "";
+}
+
+val("f-interface",   "interface",              "wlan0");
+val("f-tx-interface","tx_interface",           "");
+val("f-channel",     "channel",               "");
+val("f-port",        "port",                   5000);
+val("f-device-name", "device_name",           "");
+val("f-sensitivity", "sensitivity",            2.0);
+val("f-fall-mult",   "fall_threshold_multiplier", 3.0);
+val("f-breathing",   "breathing_detection",   true);
+val("f-fp-filter",   "false_positive_filter", true);
+val("f-occupancy",   "occupancy_tracking",    true);
+val("f-ha-url",      "ha_webhook_url",        "");
+val("f-ha-token",    "ha_token",              "");
+val("f-vercel-url",  "vercel_url",            "");
+val("f-auto-tunnel", "auto_tunnel",           false);
+val("f-retention",   "db_retention_days",     7);
+
+// Zones
+let zones = Array.isArray(cfg.alert_zones) ? [...cfg.alert_zones] : [];
+
+function renderZoneRows() {
+  const list = document.getElementById("zones-list");
+  list.innerHTML = zones.map((z, i) => `
+    <div class="zone-row" data-i="${i}">
+      <input style="width:130px;" placeholder="Zone name" value="${z.name||""}"
+             oninput="zones[${i}].name=this.value" />
+      <input type="number" style="width:100px;" placeholder="RSSI min" value="${z.rssi_min||""}"
+             oninput="zones[${i}].rssi_min=parseFloat(this.value)" />
+      <input type="number" style="width:100px;" placeholder="RSSI max" value="${z.rssi_max||""}"
+             oninput="zones[${i}].rssi_max=parseFloat(this.value)" />
+      <button onclick="zones.splice(${i},1);renderZoneRows()">✕</button>
+    </div>
+  `).join("");
+}
+renderZoneRows();
+
+document.getElementById("btn-add-zone-row").onclick = () => {
+  zones.push({ name:"", rssi_min:-70, rssi_max:-40 });
+  renderZoneRows();
+};
+
+// Save
+document.getElementById("btn-save").onclick = async () => {
+  const statusEl = document.getElementById("save-status");
+  statusEl.textContent = "Saving...";
+  statusEl.style.color = "#8b949e";
+
+  const channel   = document.getElementById("f-channel").value;
+  const txIface   = document.getElementById("f-tx-interface").value.trim();
+  const haToken   = document.getElementById("f-ha-token").value.trim();
+  const haUrl     = document.getElementById("f-ha-url").value.trim();
+  const vercelUrl = document.getElementById("f-vercel-url").value.trim();
+  const devName   = document.getElementById("f-device-name").value.trim();
+
+  const body = {
+    interface:                  document.getElementById("f-interface").value.trim() || "wlan0",
+    tx_interface:               txIface   || null,
+    channel:                    channel   ? parseInt(channel) : null,
+    port:                       parseInt(document.getElementById("f-port").value) || 5000,
+    device_name:                devName   || null,
+    sensitivity:                parseFloat(document.getElementById("f-sensitivity").value) || 2.0,
+    fall_threshold_multiplier:  parseFloat(document.getElementById("f-fall-mult").value) || 3.0,
+    breathing_detection:        document.getElementById("f-breathing").checked,
+    false_positive_filter:      document.getElementById("f-fp-filter").checked,
+    occupancy_tracking:         document.getElementById("f-occupancy").checked,
+    ha_webhook_url:             haUrl     || null,
+    ha_token:                   haToken   || null,
+    vercel_url:                 vercelUrl || null,
+    auto_tunnel:                document.getElementById("f-auto-tunnel").checked,
+    db_retention_days:          parseInt(document.getElementById("f-retention").value) || 7,
+    alert_zones:                zones,
+  };
+
+  try {
+    const resp = await fetch("/config", {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (data.ok) { statusEl.textContent = "Saved!"; statusEl.style.color = "#3fb950"; }
+    else         { statusEl.textContent = "Error: " + JSON.stringify(data.error); statusEl.style.color = "#f85149"; }
+  } catch(e) {
+    statusEl.textContent = "Request failed: " + e.message;
+    statusEl.style.color = "#f85149";
+  }
+};
+
+// HA test
+document.getElementById("btn-ha-test").onclick = async () => {
+  const resultEl = document.getElementById("ha-test-result");
+  resultEl.textContent = "Sending...";
+  resultEl.style.color = "#8b949e";
+  try {
+    const r = await fetch("/api/ha-test", { method:"POST" });
+    const d = await r.json();
+    if (d.ok) { resultEl.textContent = "Test event sent successfully!"; resultEl.style.color = "#3fb950"; }
+    else      { resultEl.textContent = "Error: " + (d.error||"unknown"); resultEl.style.color = "#f85149"; }
+  } catch(e) {
+    resultEl.textContent = "Failed: " + e.message;
+    resultEl.style.color = "#f85149";
+  }
+};
+</script>
+</body>
+</html>

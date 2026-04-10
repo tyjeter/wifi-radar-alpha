@@ -1,0 +1,22 @@
+[Unit]
+Description=Wi-Fi Radar Motion Detection
+Documentation=https://github.com/tyjeter/wifi-radar
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/wifi-radar
+ExecStart=/home/pi/wifi-radar/venv/bin/python3 /home/pi/wifi-radar/watchdog.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wifi-radar
+# Give process time to cleanly restore managed mode on stop
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
