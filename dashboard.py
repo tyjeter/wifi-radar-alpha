@@ -22,6 +22,7 @@ Usage:
 import argparse
 import json
 import sys
+import threading
 import time
 
 from flask import Flask, Response, render_template, request, jsonify
@@ -47,13 +48,16 @@ def index():
 @app.route("/stream")
 def stream():
     def generate():
-        while True:
-            try:
-                state = radar.get_state()
-                yield f"data: {json.dumps(state)}\n\n"
-            except Exception:
-                yield "data: {}\n\n"
-            time.sleep(0.5)
+        try:
+            while True:
+                try:
+                    state = radar.get_state()
+                    yield f"data: {json.dumps(state)}\n\n"
+                except Exception:
+                    yield "data: {}\n\n"
+                time.sleep(0.5)
+        except GeneratorExit:
+            pass
 
     return Response(
         generate(),
@@ -162,6 +166,11 @@ def config_save():
 # Alert zones
 # ---------------------------------------------------------------------------
 
+@app.route("/api/zones", methods=["GET"])
+def api_zones_get():
+    return jsonify(_cfg.get("alert_zones", []))
+
+
 @app.route("/api/zones", methods=["POST"])
 def api_zones():
     try:
@@ -232,6 +241,20 @@ def main():
         use_db=not args.no_db,
     )
     radar.set_alert_zones(_cfg.get("alert_zones", []))
+
+    # Prune old data now, then once per hour in the background.
+    retention_days = _cfg.get("db_retention_days", 7)
+    db.prune_old_data(retention_days)
+
+    def _prune_loop():
+        while True:
+            time.sleep(3600)
+            try:
+                db.prune_old_data(_cfg.get("db_retention_days", 7))
+            except Exception:
+                pass
+
+    threading.Thread(target=_prune_loop, daemon=True).start()
 
     try:
         if tx_interface:

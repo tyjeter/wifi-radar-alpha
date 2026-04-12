@@ -529,13 +529,9 @@ document.getElementById("heatmap").on("plotly_selected", function(eventData) {
 });
 
 // Load existing zones from server
-fetch("/config").then(r=>r.text()).then(html=>{
-  const m = html.match(/id="cfg-zones-data"[^>]*>([^<]*)</);
-  if (m) {
-    try { alertZones = JSON.parse(decodeURIComponent(m[1])); renderZones(); } catch{}
-  }
+fetch("/api/zones").then(r=>r.json()).then(data=>{
+  if (Array.isArray(data)) { alertZones = data; renderZones(); }
 }).catch(()=>{});
-fetch("/api/state").then(r=>r.json()).catch(()=>null);
 
 // -----------------------------------------------------------------------
 // Historical playback

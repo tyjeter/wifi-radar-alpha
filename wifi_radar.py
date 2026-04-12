@@ -230,7 +230,8 @@ class WifiRadar:
     def _is_interference(self, now: float) -> bool:
         if not self.fp_filter:
             return False
-        recent = [t for t in self._spike_times if t > now - 1.0]
+        with self._lock:
+            recent = [t for t in self._spike_times if t > now - 1.0]
         return len(recent) >= INTERFERENCE_SPIKE_RATE
 
     def _detect_movement(self, now: float) -> None:
@@ -253,13 +254,16 @@ class WifiRadar:
         z_score = abs(current - mean) / std
 
         if z_score > self.sensitivity:
-            self._spike_times.append(now)
+            with self._lock:
+                self._spike_times.append(now)
 
         if self._is_interference(now):
             return  # suppress — looks like microwave or other periodic interference
 
         fall_z = self.sensitivity * self.fall_multiplier
-        if z_score > fall_z and (now - self._last_fall_alert) > 10.0:
+        with self._lock:
+            last_fall = self._last_fall_alert
+        if z_score > fall_z and (now - last_fall) > 10.0:
             threading.Timer(
                 FALL_SILENCE_S, self._check_fall_confirmation, args=(now, z_score)
             ).start()
@@ -287,8 +291,11 @@ class WifiRadar:
         smoothed = uniform_filter1d(recent, size=min(5, len(recent)))
         std = float(np.std(smoothed))
         now = time.time()
-        if std < 0.5 and (now - self._last_fall_alert) > 10.0:
-            self._last_fall_alert = now
+        with self._lock:
+            already_alerted = (now - self._last_fall_alert) <= 10.0
+        if std < 0.5 and not already_alerted:
+            with self._lock:
+                self._last_fall_alert = now
             fall = {"ts": event_ts, "z_score": round(peak_z, 2)}
             with self._lock:
                 self.fall_events.append(fall)

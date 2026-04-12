@@ -203,15 +203,19 @@ val("f-retention",   "db_retention_days",     7);
 // Zones
 let zones = Array.isArray(cfg.alert_zones) ? [...cfg.alert_zones] : [];
 
+function escAttr(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 function renderZoneRows() {
   const list = document.getElementById("zones-list");
   list.innerHTML = zones.map((z, i) => `
     <div class="zone-row" data-i="${i}">
-      <input style="width:130px;" placeholder="Zone name" value="${z.name||""}"
+      <input style="width:130px;" placeholder="Zone name" value="${escAttr(z.name)}"
              oninput="zones[${i}].name=this.value" />
-      <input type="number" style="width:100px;" placeholder="RSSI min" value="${z.rssi_min||""}"
+      <input type="number" style="width:100px;" placeholder="RSSI min" value="${escAttr(z.rssi_min)}"
              oninput="zones[${i}].rssi_min=parseFloat(this.value)" />
-      <input type="number" style="width:100px;" placeholder="RSSI max" value="${z.rssi_max||""}"
+      <input type="number" style="width:100px;" placeholder="RSSI max" value="${escAttr(z.rssi_max)}"
              oninput="zones[${i}].rssi_max=parseFloat(this.value)" />
       <button onclick="zones.splice(${i},1);renderZoneRows()">✕</button>
     </div>

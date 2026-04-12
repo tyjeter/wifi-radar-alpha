@@ -19,6 +19,9 @@ def _conn() -> sqlite3.Connection:
 def init_db() -> None:
     with _lock:
         con = _conn()
+        # WAL mode allows concurrent reads during writes — important since the
+        # dashboard reads while the radar thread writes at 1 Hz.
+        con.execute("PRAGMA journal_mode=WAL")
         con.executescript("""
             CREATE TABLE IF NOT EXISTS rssi_history (
                 id       INTEGER PRIMARY KEY AUTOINCREMENT,
