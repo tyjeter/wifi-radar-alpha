@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import re
 import signal
@@ -31,6 +32,7 @@ STALL_THRESHOLD_S = 30      # seconds without new packets = adapter stalled
 CHECK_INTERVAL_S  = 10      # how often to check all processes
 RESTART_DELAY_S   = 3       # seconds to wait before restarting a dead process
 LOG_FILE          = os.path.expanduser("~/.wifi_radar_watchdog.log")
+LOG_MAX_BYTES     = 5 * 1024 * 1024   # 5 MB — truncate oldest half when exceeded
 
 
 def log(msg: str) -> None:
@@ -38,6 +40,11 @@ def log(msg: str) -> None:
     line = f"[{ts}] {msg}"
     print(line, flush=True)
     try:
+        if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > LOG_MAX_BYTES:
+            with open(LOG_FILE, "rb") as f:
+                content = f.read()
+            with open(LOG_FILE, "wb") as f:
+                f.write(content[len(content) // 2:])
         with open(LOG_FILE, "a") as f:
             f.write(line + "\n")
     except OSError:
@@ -142,7 +149,6 @@ class Watchdog:
             resp = urllib.request.urlopen(
                 f"http://localhost:{self.port}/api/state", timeout=5
             )
-            import json
             state = json.loads(resp.read())
             pkt = state.get("packet_count", 0)
             now = time.time()

@@ -108,8 +108,11 @@ def api_occupancy():
 
 @app.route("/export/csv")
 def export_csv():
-    since = float(request.args.get("since", time.time() - 86400))
-    until = float(request.args.get("until", time.time()))
+    try:
+        since = float(request.args.get("since", time.time() - 86400))
+        until = float(request.args.get("until", time.time()))
+    except (ValueError, TypeError):
+        return jsonify({"error": "invalid since/until params"}), 400
     csv_data = db.export_csv(since=since, until=until)
     filename = time.strftime("wifi_radar_%Y%m%d_%H%M%S.csv")
     return Response(
