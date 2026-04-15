@@ -40,8 +40,10 @@ def load() -> dict:
         try:
             with open(CONFIG_PATH) as f:
                 cfg.update(json.load(f))
-        except Exception:
-            pass
+        except json.JSONDecodeError as e:
+            print(f"[!] Config file corrupted ({e}), using defaults")
+        except Exception as e:
+            print(f"[!] Could not load config: {e}")
     return cfg
 
 

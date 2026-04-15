@@ -95,7 +95,10 @@ def api_history():
 
 @app.route("/api/occupancy")
 def api_occupancy():
-    days = int(request.args.get("days", 30))
+    try:
+        days = int(request.args.get("days", 30))
+    except (ValueError, TypeError):
+        return jsonify({"error": "invalid days param"}), 400
     return jsonify(db.get_occupancy(days=days))
 
 

@@ -152,5 +152,6 @@ def prune_old_data(days: int = 7) -> None:
     with _lock:
         con = _conn()
         con.execute("DELETE FROM rssi_history WHERE ts < ?", (cutoff,))
+        con.execute("DELETE FROM events WHERE ts < ?", (cutoff,))
         con.commit()
         con.close()
